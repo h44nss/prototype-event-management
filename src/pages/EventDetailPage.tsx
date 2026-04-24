@@ -94,6 +94,7 @@ export default function EventDetailPage({ event: initialEvent, onBack, onEventUp
 
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
+  
 
   useEffect(() => {
     if (activeTab === 'setup') {
@@ -108,7 +109,7 @@ export default function EventDetailPage({ event: initialEvent, onBack, onEventUp
 
   async function loadFloorplan() {
     const { data: hallData } = await supabase.from('halls').select('*').eq('event_id', event.id).order('name');
-    const { data: boothData } = await supabase.from('booths').select('*, exhibitor:profiles!booths_exhibitor_id_fkey(id, name, company)').eq('event_id', event.id).order('number');
+    const { data: boothData } = await supabase.from('booths').select('*, exhibitor:profiles!booths_exhibitor_id_fkey(id, full_name, company)').eq('event_id', event.id).order('number');
     setHalls((hallData as Hall[]) ?? []);
     setBooths((boothData as Booth[]) ?? []);
     if (!selectedHall && hallData && hallData.length > 0) setSelectedHall(hallData[0] as Hall);
@@ -126,51 +127,132 @@ export default function EventDetailPage({ event: initialEvent, onBack, onEventUp
 
   async function loadParticipants() {
     setLoading(true);
-    const { data } = await supabase.from('event_participants').select('*, exhibitor:profiles!event_participants_exhibitor_id_fkey(id, name, company, phone), booth:booths(id, number)').eq('event_id', event.id).order('created_at', { ascending: false });
+    const { data } = await supabase
+    .from('event_participants')
+    .select(`
+      *,
+      exhibitor:profiles(id, full_name),
+      booth:booths(id, number)
+    `)
     setParticipants((data as EventParticipant[]) ?? []);
     setLoading(false);
   }
 
   async function loadExhibitors() {
-    const { data } = await supabase.from('profiles').select('id, name, company, phone').eq('role', 'exhibitor').eq('is_active', true).order('name');
+    const { data } = await supabase.from('profiles').select('id, full_name, company, phone').eq('role', 'exhibitor').eq('is_active', true).order('full_name');
     setExhibitors((data as Profile[]) ?? []);
   }
 
   async function loadOrganizers() {
-    setLoading(true);
-    const { data } = await supabase.from('event_organizers').select('*, organizer:profiles!event_organizers_organizer_id_fkey(id, name, company), hall:halls(id, name)').eq('event_id', event.id);
-    setOrganizers((data as EventOrganizer[]) ?? []);
+  setLoading(true);
+  
+  // 1. Fetch data
+  const { data, error } = await supabase
+    .from('event_organizers')
+    .select(`
+  *,
+  organizer:profiles(id, full_name, company),
+  hall:halls(id, name)
+`)
+    .eq('event_id', event.id);
+
+  if (error) {
+    console.error("Supabase Error:", error);
     setLoading(false);
+    return;
   }
 
+  // 2. Map and Transform the data to match the Interface
+  if (data) {
+    const formattedData: EventOrganizer[] = data.map((item: any) => ({
+      ...item,
+      // Extract the hall_id from the nested object if it exists
+      hall_id: item.hall?.id || null, 
+    }));
+
+    setOrganizers(formattedData);
+  }
+
+  setLoading(false);
+}
+
   async function loadEoAdmins() {
-    const { data } = await supabase.from('profiles').select('id, name, company').eq('role', 'eo_admin').eq('is_active', true).order('name');
+    const { data } = await supabase.from('profiles').select('id, full_name, company').eq('role', 'eo_admin').eq('is_active', true).order('full_name');
     setEoAdmins((data as Profile[]) ?? []);
   }
 
   async function loadContractorAssignments() {
-    setLoading(true);
-    const { data } = await supabase.from('contractor_assignments').select('*, contractor:profiles!contractor_assignments_contractor_id_fkey(id, name, company), hall:halls(id, name)').eq('event_id', event.id);
-    setContractorAssignments((data as ContractorAssignment[]) ?? []);
+  setLoading(true);
+
+  const { data, error } = await supabase
+  .from('contractor_assignments')
+  .select(`
+    id,
+    event_id,
+    contractor_id,
+    notes,
+    service_categories,
+    created_at,
+    contractor:profiles(id, full_name, company)
+  `)
+  .eq('event_id', event.id);
+
+  if (error) {
+    console.error(error);
+    setContractorAssignments([]);
     setLoading(false);
+    return;
   }
 
+  setContractorAssignments((data as ContractorAssignment[]) ?? []);
+  setLoading(false);
+}
+
+
+
   async function loadContractors() {
-    const { data } = await supabase.from('profiles').select('id, name, company').eq('role', 'contractor').eq('is_active', true).order('name');
+    const { data } = await supabase.from('profiles').select('id, full_name, company').eq('role', 'contractor').eq('is_active', true).order('full_name');
     setContractorProfiles((data as Profile[]) ?? []);
   }
 
   async function saveEvent() {
-    setSaving(true);
-    const { data, error } = await supabase.from('events').update({ ...eventForm, updated_at: new Date().toISOString() }).eq('id', event.id).select().maybeSingle();
-    if (!error && data) {
-      const updated = data as Event;
-      setEvent(updated);
-      onEventUpdate?.(updated);
-      setEditingEvent(false);
-    }
+  setSaving(true);
+  
+  // 1. Create the update payload (exclude updated_at)
+  const updatePayload = {
+    name: eventForm.name,
+    description: eventForm.description,
+    location: eventForm.location,
+    start_date: eventForm.start_date,
+    end_date: eventForm.end_date,
+    status: eventForm.status as Event['status'],
+  };
+
+  // 2. Perform the update
+  const { data, error } = await supabase
+    .from('events')
+    .update(updatePayload)
+    .eq('id', event.id)
+    .select()
+    .maybeSingle();
+
+  // 3. Handle result
+  if (error) {
+    console.error("Update failed:", error);
+    // Add toast or error notification here
     setSaving(false);
+    return;
   }
+
+  if (data) {
+    const updated = data as Event;
+    setEvent(updated);
+    onEventUpdate?.(updated);
+    setEditingEvent(false);
+  }
+  
+  setSaving(false);
+}
 
   async function saveHall() {
     setSaving(true);
@@ -197,6 +279,10 @@ export default function EventDetailPage({ event: initialEvent, onBack, onEventUp
   async function saveBooth() {
     setSaving(true);
     const hallId = boothForm.hall_id || selectedHall?.id;
+    if (!hallId) {
+      setSaving(false);
+      return;
+    }
     if (editBooth) {
       await supabase.from('booths').update({ number: boothForm.number, size: boothForm.size, hall_id: hallId, updated_at: new Date().toISOString() }).eq('id', editBooth.id);
     } else {
@@ -255,11 +341,14 @@ export default function EventDetailPage({ event: initialEvent, onBack, onEventUp
   async function saveOrganizer() {
     if (!orgForm.organizer_id) return;
     setSaving(true);
-    await supabase.from('event_organizers').upsert({
+    const upsertData: any = {
       event_id: event.id,
       organizer_id: orgForm.organizer_id,
-      hall_id: orgForm.hall_id || null,
-    }, { onConflict: 'event_id,organizer_id' });
+    };
+    if (orgForm.hall_id) {
+      upsertData.hall_id = orgForm.hall_id;
+    }
+    await supabase.from('event_organizers').upsert(upsertData, { onConflict: 'event_id,organizer_id' });
     setShowOrgModal(false);
     setOrgForm({ organizer_id: '', hall_id: '' });
     loadOrganizers();
@@ -306,7 +395,7 @@ export default function EventDetailPage({ event: initialEvent, onBack, onEventUp
   const assignedBooths = booths.filter((b) => b.status === 'assigned');
 
   const filteredExhibitors = exhibitors.filter((e) =>
-    e.name.toLowerCase().includes(exhibitorSearch.toLowerCase()) ||
+    (e.full_name ?? '').toLowerCase().includes(exhibitorSearch.toLowerCase()) ||
     (e.company ?? '').toLowerCase().includes(exhibitorSearch.toLowerCase())
   );
 
@@ -578,7 +667,7 @@ export default function EventDetailPage({ event: initialEvent, onBack, onEventUp
                               <StatusBadge status={booth.status} size="sm" />
                             </div>
                             {booth.size && <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{booth.size}</p>}
-                            {exhibitor && <p className="text-xs text-blue-600 dark:text-blue-400 font-medium truncate">{exhibitor.name}</p>}
+                            {exhibitor && <p className="text-xs text-blue-600 dark:text-blue-400 font-medium truncate">{exhibitor.full_name}</p>}
                             {isAdmin && (
                               <div className="absolute top-2 right-2 hidden group-hover:flex gap-1">
                                 <button onClick={() => { setEditBooth(booth); setBoothForm({ number: booth.number, size: booth.size ?? '', hall_id: booth.hall_id }); setShowBoothModal(true); }} className="p-0.5 bg-white dark:bg-gray-900 rounded shadow text-gray-500 hover:text-blue-600"><Edit2 size={11} /></button>
@@ -659,10 +748,10 @@ export default function EventDetailPage({ event: initialEvent, onBack, onEventUp
                           <div key={p.id} className="flex items-center justify-between px-4 py-3">
                             <div className="flex items-center gap-3 flex-1 min-w-0">
                               <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
-                                <span className="text-xs font-bold text-blue-600 dark:text-blue-400">{exhibitor?.name?.charAt(0)?.toUpperCase() ?? '?'}</span>
+                                <span className="text-xs font-bold text-blue-600 dark:text-blue-400">{exhibitor?.full_name?.charAt(0)?.toUpperCase() ?? '?'}</span>
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{exhibitor?.name ?? '-'}</p>
+                                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{exhibitor?.full_name ?? '-'}</p>
                                 <p className="text-xs text-gray-400">{exhibitor?.company ?? '-'}</p>
                               </div>
                             </div>
@@ -714,10 +803,10 @@ export default function EventDetailPage({ event: initialEvent, onBack, onEventUp
                       <div key={p.id} className="flex items-center justify-between px-4 py-4">
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                           <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
-                            <span className="text-sm font-bold text-blue-600 dark:text-blue-400">{exhibitor?.name?.charAt(0)?.toUpperCase() ?? '?'}</span>
+                            <span className="text-sm font-bold text-blue-600 dark:text-blue-400">{exhibitor?.full_name?.charAt(0)?.toUpperCase() ?? '?'}</span>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-gray-900 dark:text-white">{exhibitor?.name ?? '-'}</p>
+                            <p className="text-sm font-semibold text-gray-900 dark:text-white">{exhibitor?.full_name ?? '-'}</p>
                             <p className="text-xs text-gray-500 dark:text-gray-400">{exhibitor?.company ?? '-'} {exhibitor?.phone ? `· ${exhibitor.phone}` : ''}</p>
                           </div>
                         </div>
@@ -767,10 +856,10 @@ export default function EventDetailPage({ event: initialEvent, onBack, onEventUp
                       <div key={o.id} className="flex items-center justify-between px-4 py-4">
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                           <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center flex-shrink-0">
-                            <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{org?.name?.charAt(0)?.toUpperCase() ?? '?'}</span>
+                            <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{org?.full_name?.charAt(0)?.toUpperCase() ?? '?'}</span>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-gray-900 dark:text-white">{org?.name ?? '-'}</p>
+                            <p className="text-sm font-semibold text-gray-900 dark:text-white">{org?.full_name ?? '-'}</p>
                             <p className="text-xs text-gray-500 dark:text-gray-400">{org?.company ?? '-'}</p>
                           </div>
                         </div>
@@ -817,10 +906,10 @@ export default function EventDetailPage({ event: initialEvent, onBack, onEventUp
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-center gap-3 flex-1 min-w-0">
                             <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center flex-shrink-0">
-                              <span className="text-sm font-bold text-amber-600 dark:text-amber-400">{contractor?.name?.charAt(0)?.toUpperCase() ?? '?'}</span>
+                              <span className="text-sm font-bold text-amber-600 dark:text-amber-400">{contractor?.full_name?.charAt(0)?.toUpperCase() ?? '?'}</span>
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-semibold text-gray-900 dark:text-white">{contractor?.name ?? '-'}</p>
+                              <p className="text-sm font-semibold text-gray-900 dark:text-white">{contractor?.full_name ?? '-'}</p>
                               <p className="text-xs text-gray-500 dark:text-gray-400">{contractor?.company ?? '-'}</p>
                             </div>
                           </div>
@@ -910,7 +999,7 @@ export default function EventDetailPage({ event: initialEvent, onBack, onEventUp
               <div className="py-8 text-center text-sm text-gray-400">No exhibitors found</div>
             ) : filteredExhibitors.map((ex) => (
               <button key={ex.id} onClick={() => setInviteForm({ ...inviteForm, exhibitor_id: ex.id })} className={`w-full text-left px-4 py-3 transition-colors ${inviteForm.exhibitor_id === ex.id ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
-                <p className="text-sm font-medium text-gray-900 dark:text-white">{ex.name}</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">{ex.full_name}</p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">{ex.company ?? '-'}</p>
               </button>
             ))}
@@ -936,7 +1025,7 @@ export default function EventDetailPage({ event: initialEvent, onBack, onEventUp
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Select EO Admin *</label>
             <select value={orgForm.organizer_id} onChange={(e) => setOrgForm({ ...orgForm, organizer_id: e.target.value })} className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="">Select organizer</option>
-              {eoAdmins.map((a) => <option key={a.id} value={a.id}>{a.name} {a.company ? `(${a.company})` : ''}</option>)}
+              {eoAdmins.map((a) => <option key={a.id} value={a.id}>{a.full_name} {a.company ? `(${a.company})` : ''}</option>)}
             </select>
           </div>
           <div>
@@ -960,7 +1049,7 @@ export default function EventDetailPage({ event: initialEvent, onBack, onEventUp
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Contractor *</label>
             <select value={contractorForm.contractor_id} onChange={(e) => setContractorForm({ ...contractorForm, contractor_id: e.target.value })} className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="">Select contractor</option>
-              {contractorProfiles.map((c) => <option key={c.id} value={c.id}>{c.name} {c.company ? `(${c.company})` : ''}</option>)}
+              {contractorProfiles.map((c) => <option key={c.id} value={c.id}>{c.full_name} {c.company ? `(${c.company})` : ''}</option>)}
             </select>
           </div>
           <div>
@@ -1008,7 +1097,7 @@ export default function EventDetailPage({ event: initialEvent, onBack, onEventUp
         title="Delete Hall"
         message={`Delete "${deleteHallTarget?.name}"? All booths inside will also be deleted.`}
         confirmLabel="Delete"
-        danger
+        variant="danger"
       />
       <ConfirmDialog
         open={!!deleteBoothTarget}
@@ -1017,7 +1106,7 @@ export default function EventDetailPage({ event: initialEvent, onBack, onEventUp
         title="Delete Booth"
         message={`Delete booth #${deleteBoothTarget?.number}?`}
         confirmLabel="Delete"
-        danger
+        variant="danger"
       />
     </div>
   );

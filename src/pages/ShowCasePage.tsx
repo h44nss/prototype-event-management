@@ -46,10 +46,10 @@ export default function ShowcasePage() {
   async function loadParticipantEvents() {
     setLoading(true);
     const { data } = await supabase
-      .from('event_participants')
-      .select('event_id, booth_id, event:events(id, name, status), booth:booths(id, number)')
-      .eq('exhibitor_id', profile!.id)
-      .order('created_at', { ascending: false });
+  .from('event_participants')
+  .select('event_id, booth_id, event:events(id,name,status), booth:booths(id,number)')
+  .eq('exhibitor_id', profile!.id)
+  .order('event_id', { ascending: false }); // ✅ FIX
     const rows = (data as EventParticipantRow[]) ?? [];
     setParticipantEvents(rows);
     if (rows.length > 0) setSelectedEventId(rows[0].event_id);
@@ -90,40 +90,43 @@ export default function ShowcasePage() {
   }
 
   async function handleSave() {
-    setSaving(true);
-    try {
-      const ep = participantEvents.find((p) => p.event_id === selectedEventId);
-      let logoUrl = showcase?.logo_url ?? null;
-      let keyVisualUrl = showcase?.key_visual_url ?? null;
+  setSaving(true);
 
-      if (logoFile) logoUrl = await uploadImage(logoFile, `logos/${profile!.id}`);
-      if (keyVisualFile) keyVisualUrl = await uploadImage(keyVisualFile, `key-visuals/${profile!.id}`);
+  try {
+    let logoUrl = showcase?.logo_url ?? null;
 
-      const payload = {
-        exhibitor_id: profile!.id,
-        event_id: selectedEventId,
-        booth_id: ep?.booth_id ?? null,
-        description: form.description,
-        website_url: form.website_url,
-        logo_url: logoUrl,
-        key_visual_url: keyVisualUrl,
-        products: products as any,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (showcase) {
-        await supabase.from('showcase').update(payload).eq('id', showcase.id);
-      } else {
-        await supabase.from('showcase').insert(payload);
-      }
-
-      setLogoFile(null);
-      setKeyVisualFile(null);
-      await loadShowcase();
-    } finally {
-      setSaving(false);
+    if (logoFile) {
+      logoUrl = await uploadImage(logoFile, `logos/${profile!.id}`);
     }
+
+    const payload = {
+      exhibitor_id: profile!.id,
+      event_id: selectedEventId,
+      description: form.description,
+      logo_url: logoUrl,
+      products: products as any,
+    };
+
+    if (showcase) {
+      await supabase
+        .from('showcase')
+        .update(payload)
+        .eq('id', showcase.id);
+    } else {
+      await supabase
+        .from('showcase')
+        .insert(payload);
+    }
+
+    setLogoFile(null);
+    setKeyVisualFile(null);
+
+    await loadShowcase();
+
+  } finally {
+    setSaving(false);
   }
+}
 
   function handleFileChange(file: File | null, setFile: (f: File | null) => void, setPreview: (s: string | null) => void) {
     if (!file) return;

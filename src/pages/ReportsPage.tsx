@@ -3,7 +3,7 @@ import { BarChart3, TrendingUp, Package, CheckCircle, CreditCard, Users, Downloa
 import { supabase } from '../lib/supabase';
 import { formatCurrency } from '../lib/utils';
 import LoadingSpinner from '../components/common/LoadingSpinner';
-import type { Order, Payment, Profile, Service, Event } from '../lib/types';
+import type { Order, Profile, Service, Event } from '../lib/types';
 
 type Period = 'week' | 'month' | 'quarter' | 'year';
 
@@ -71,7 +71,7 @@ export default function ReportsPage() {
     const from = getPeriodStart(period);
     const { data } = await supabase
       .from('orders')
-      .select('*, service:services(id, name, category), exhibitor:profiles!orders_exhibitor_id_fkey(id, name, company), event:events(id, name)')
+      .select('*, service:services(id, name, category), exhibitor:profiles!orders_exhibitor_id_fkey(id, full_name, company), event:events(id, name)')
       .gte('created_at', from.toISOString())
       .order('created_at', { ascending: false });
     setOrders((data as OrderWithRels[]) ?? []);
@@ -298,7 +298,7 @@ export default function ReportsPage() {
                     <tr key={o.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
                       <td className="px-4 py-3 font-mono text-xs font-medium text-gray-900 dark:text-white whitespace-nowrap">{o.invoice_number}</td>
                       <td className="px-4 py-3 text-gray-700 dark:text-gray-300 max-w-[140px] truncate">{(o.service as unknown as Service)?.name ?? '-'}</td>
-                      <td className="px-4 py-3 text-gray-700 dark:text-gray-300 whitespace-nowrap">{(o.exhibitor as unknown as Profile)?.name ?? '-'}</td>
+                      <td className="px-4 py-3 text-gray-700 dark:text-gray-300 whitespace-nowrap">{(o.exhibitor as unknown as Profile)?.full_name ?? '-'}</td>
                       <td className="px-4 py-3 text-gray-600 dark:text-gray-400 max-w-[130px] truncate">{(o.event as unknown as Event)?.name ?? '-'}</td>
                       <td className="px-4 py-3 text-gray-700 dark:text-gray-300 font-medium whitespace-nowrap">{formatCurrency(o.total_price)}</td>
                       <td className="px-4 py-3">

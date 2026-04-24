@@ -16,40 +16,27 @@ export type Database = {
     Tables: {
       assignments: {
         Row: {
-          assigned_by: string | null
           contractor_id: string | null
           created_at: string | null
           id: string
           notes: string | null
           order_id: string | null
-          request_id: string | null
         }
         Insert: {
-          assigned_by?: string | null
           contractor_id?: string | null
           created_at?: string | null
           id?: string
           notes?: string | null
           order_id?: string | null
-          request_id?: string | null
         }
         Update: {
-          assigned_by?: string | null
           contractor_id?: string | null
           created_at?: string | null
           id?: string
           notes?: string | null
           order_id?: string | null
-          request_id?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "assignments_assigned_by_fkey"
-            columns: ["assigned_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "assignments_contractor_id_fkey"
             columns: ["contractor_id"]
@@ -64,13 +51,6 @@ export type Database = {
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "assignments_request_id_fkey"
-            columns: ["request_id"]
-            isOneToOne: false
-            referencedRelation: "service_requests"
-            referencedColumns: ["id"]
-          },
         ]
       }
       booths: {
@@ -82,7 +62,7 @@ export type Database = {
           id: string
           number: string
           size: string | null
-          status: string
+          status: string | null
           updated_at: string | null
         }
         Insert: {
@@ -93,7 +73,7 @@ export type Database = {
           id?: string
           number: string
           size?: string | null
-          status?: string
+          status?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -104,7 +84,7 @@ export type Database = {
           id?: string
           number?: string
           size?: string | null
-          status?: string
+          status?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -134,33 +114,33 @@ export type Database = {
       contractor_assignments: {
         Row: {
           booth_id: string | null
-          contractor_id: string
+          contractor_id: string | null
           created_at: string | null
-          event_id: string
+          event_id: string | null
           hall_id: string | null
           id: string
           notes: string | null
-          service_categories: string[]
+          service_categories: string[] | null
         }
         Insert: {
           booth_id?: string | null
-          contractor_id: string
+          contractor_id?: string | null
           created_at?: string | null
-          event_id: string
+          event_id?: string | null
           hall_id?: string | null
           id?: string
           notes?: string | null
-          service_categories?: string[]
+          service_categories?: string[] | null
         }
         Update: {
           booth_id?: string | null
-          contractor_id?: string
+          contractor_id?: string | null
           created_at?: string | null
-          event_id?: string
+          event_id?: string | null
           hall_id?: string | null
           id?: string
           notes?: string | null
-          service_categories?: string[]
+          service_categories?: string[] | null
         }
         Relationships: [
           {
@@ -193,65 +173,26 @@ export type Database = {
           },
         ]
       }
-      contractors_services: {
-        Row: {
-          contractor_id: string | null
-          created_at: string | null
-          id: string
-          service_id: string | null
-        }
-        Insert: {
-          contractor_id?: string | null
-          created_at?: string | null
-          id?: string
-          service_id?: string | null
-        }
-        Update: {
-          contractor_id?: string | null
-          created_at?: string | null
-          id?: string
-          service_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "contractors_services_contractor_id_fkey"
-            columns: ["contractor_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "contractors_services_service_id_fkey"
-            columns: ["service_id"]
-            isOneToOne: false
-            referencedRelation: "services"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       event_organizers: {
         Row: {
           created_at: string | null
-          event_id: string
-          hall_id: string | null
+          event_id: string | null
           id: string
-          organizer_id: string
+          organizer_id: string | null
           role_label: string | null
         }
         Insert: {
           created_at?: string | null
-          event_id: string
-          hall_id?: string | null
+          event_id?: string | null
           id?: string
-          organizer_id: string
+          organizer_id?: string | null
           role_label?: string | null
         }
         Update: {
           created_at?: string | null
-          event_id?: string
-          hall_id?: string | null
+          event_id?: string | null
           id?: string
-          organizer_id?: string
+          organizer_id?: string | null
           role_label?: string | null
         }
         Relationships: [
@@ -260,13 +201,6 @@ export type Database = {
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "events"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "event_organizers_hall_id_fkey"
-            columns: ["hall_id"]
-            isOneToOne: false
-            referencedRelation: "halls"
             referencedColumns: ["id"]
           },
           {
@@ -282,35 +216,32 @@ export type Database = {
         Row: {
           accepted_at: string | null
           booth_id: string | null
-          created_at: string | null
-          event_id: string
-          exhibitor_id: string
+          event_id: string | null
+          exhibitor_id: string | null
           id: string
           invited_at: string | null
           notes: string | null
-          status: string
+          status: string | null
         }
         Insert: {
           accepted_at?: string | null
           booth_id?: string | null
-          created_at?: string | null
-          event_id: string
-          exhibitor_id: string
+          event_id?: string | null
+          exhibitor_id?: string | null
           id?: string
           invited_at?: string | null
           notes?: string | null
-          status?: string
+          status?: string | null
         }
         Update: {
           accepted_at?: string | null
           booth_id?: string | null
-          created_at?: string | null
-          event_id?: string
-          exhibitor_id?: string
+          event_id?: string | null
+          exhibitor_id?: string | null
           id?: string
           invited_at?: string | null
           notes?: string | null
-          status?: string
+          status?: string | null
         }
         Relationships: [
           {
@@ -340,26 +271,26 @@ export type Database = {
         Row: {
           created_at: string | null
           custom_price: number | null
-          event_id: string
+          event_id: string | null
           id: string
-          is_active: boolean
-          service_id: string
+          is_active: boolean | null
+          service_id: string | null
         }
         Insert: {
           created_at?: string | null
           custom_price?: number | null
-          event_id: string
+          event_id?: string | null
           id?: string
-          is_active?: boolean
-          service_id: string
+          is_active?: boolean | null
+          service_id?: string | null
         }
         Update: {
           created_at?: string | null
           custom_price?: number | null
-          event_id?: string
+          event_id?: string | null
           id?: string
-          is_active?: boolean
-          service_id?: string
+          is_active?: boolean | null
+          service_id?: string | null
         }
         Relationships: [
           {
@@ -389,8 +320,7 @@ export type Database = {
           name: string
           organizer_id: string | null
           start_date: string
-          status: string
-          updated_at: string | null
+          status: string | null
         }
         Insert: {
           created_at?: string | null
@@ -402,8 +332,7 @@ export type Database = {
           name: string
           organizer_id?: string | null
           start_date: string
-          status?: string
-          updated_at?: string | null
+          status?: string | null
         }
         Update: {
           created_at?: string | null
@@ -415,8 +344,7 @@ export type Database = {
           name?: string
           organizer_id?: string | null
           start_date?: string
-          status?: string
-          updated_at?: string | null
+          status?: string | null
         }
         Relationships: [
           {
@@ -464,31 +392,28 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
-          is_read: boolean
+          is_read: boolean | null
           message: string | null
-          related_id: string | null
-          title: string
-          type: string
+          title: string | null
+          type: string | null
           user_id: string | null
         }
         Insert: {
           created_at?: string | null
           id?: string
-          is_read?: boolean
+          is_read?: boolean | null
           message?: string | null
-          related_id?: string | null
-          title: string
-          type?: string
+          title?: string | null
+          type?: string | null
           user_id?: string | null
         }
         Update: {
           created_at?: string | null
           id?: string
-          is_read?: boolean
+          is_read?: boolean | null
           message?: string | null
-          related_id?: string | null
-          title?: string
-          type?: string
+          title?: string | null
+          type?: string | null
           user_id?: string | null
         }
         Relationships: [
@@ -510,11 +435,11 @@ export type Database = {
           id: string
           invoice_number: string
           notes: string | null
-          quantity: number
+          quantity: number | null
           service_id: string | null
-          status: string
-          total_price: number
-          unit_price: number
+          status: string | null
+          total_price: number | null
+          unit_price: number | null
           updated_at: string | null
         }
         Insert: {
@@ -525,11 +450,11 @@ export type Database = {
           id?: string
           invoice_number: string
           notes?: string | null
-          quantity?: number
+          quantity?: number | null
           service_id?: string | null
-          status?: string
-          total_price?: number
-          unit_price?: number
+          status?: string | null
+          total_price?: number | null
+          unit_price?: number | null
           updated_at?: string | null
         }
         Update: {
@@ -540,11 +465,11 @@ export type Database = {
           id?: string
           invoice_number?: string
           notes?: string | null
-          quantity?: number
+          quantity?: number | null
           service_id?: string | null
-          status?: string
-          total_price?: number
-          unit_price?: number
+          status?: string | null
+          total_price?: number | null
+          unit_price?: number | null
           updated_at?: string | null
         }
         Relationships: [
@@ -582,37 +507,28 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
-          notes: string | null
           order_id: string | null
-          payment_method: string
+          payment_method: string | null
           proof_url: string | null
-          request_id: string | null
-          status: string
-          updated_at: string | null
+          status: string | null
           verified_by: string | null
         }
         Insert: {
           created_at?: string | null
           id?: string
-          notes?: string | null
           order_id?: string | null
-          payment_method: string
+          payment_method?: string | null
           proof_url?: string | null
-          request_id?: string | null
-          status?: string
-          updated_at?: string | null
+          status?: string | null
           verified_by?: string | null
         }
         Update: {
           created_at?: string | null
           id?: string
-          notes?: string | null
           order_id?: string | null
-          payment_method?: string
+          payment_method?: string | null
           proof_url?: string | null
-          request_id?: string | null
-          status?: string
-          updated_at?: string | null
+          status?: string | null
           verified_by?: string | null
         }
         Relationships: [
@@ -621,13 +537,6 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "payments_request_id_fkey"
-            columns: ["request_id"]
-            isOneToOne: false
-            referencedRelation: "service_requests"
             referencedColumns: ["id"]
           },
           {
@@ -644,93 +553,36 @@ export type Database = {
           avatar_url: string | null
           company: string | null
           created_at: string | null
+          full_name: string | null
           id: string
-          is_active: boolean
-          name: string
+          is_active: boolean | null
           npwp: string | null
           phone: string | null
           role: string
-          updated_at: string | null
         }
         Insert: {
           avatar_url?: string | null
           company?: string | null
           created_at?: string | null
+          full_name?: string | null
           id: string
-          is_active?: boolean
-          name?: string
+          is_active?: boolean | null
           npwp?: string | null
           phone?: string | null
           role?: string
-          updated_at?: string | null
         }
         Update: {
           avatar_url?: string | null
           company?: string | null
           created_at?: string | null
+          full_name?: string | null
           id?: string
-          is_active?: boolean
-          name?: string
+          is_active?: boolean | null
           npwp?: string | null
           phone?: string | null
           role?: string
-          updated_at?: string | null
         }
         Relationships: []
-      }
-      service_requests: {
-        Row: {
-          created_at: string | null
-          description: string | null
-          estimated_cost: number | null
-          event_id: string | null
-          exhibitor_id: string | null
-          id: string
-          request_number: string
-          service_type: string
-          status: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          description?: string | null
-          estimated_cost?: number | null
-          event_id?: string | null
-          exhibitor_id?: string | null
-          id?: string
-          request_number: string
-          service_type: string
-          status?: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          description?: string | null
-          estimated_cost?: number | null
-          event_id?: string | null
-          exhibitor_id?: string | null
-          id?: string
-          request_number?: string
-          service_type?: string
-          status?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "service_requests_event_id_fkey"
-            columns: ["event_id"]
-            isOneToOne: false
-            referencedRelation: "events"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "service_requests_exhibitor_id_fkey"
-            columns: ["exhibitor_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       services: {
         Row: {
@@ -746,7 +598,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
-          category?: string
+          category: string
           created_at?: string | null
           description?: string | null
           id?: string
@@ -773,52 +625,33 @@ export type Database = {
       }
       showcase: {
         Row: {
-          booth_id: string | null
           created_at: string | null
           description: string | null
-          event_id: string
-          exhibitor_id: string
+          event_id: string | null
+          exhibitor_id: string | null
           id: string
-          key_visual_url: string | null
           logo_url: string | null
-          products: Json
-          updated_at: string | null
-          website_url: string | null
+          products: Json | null
         }
         Insert: {
-          booth_id?: string | null
           created_at?: string | null
           description?: string | null
-          event_id: string
-          exhibitor_id: string
+          event_id?: string | null
+          exhibitor_id?: string | null
           id?: string
-          key_visual_url?: string | null
           logo_url?: string | null
-          products?: Json
-          updated_at?: string | null
-          website_url?: string | null
+          products?: Json | null
         }
         Update: {
-          booth_id?: string | null
           created_at?: string | null
           description?: string | null
-          event_id?: string
-          exhibitor_id?: string
+          event_id?: string | null
+          exhibitor_id?: string | null
           id?: string
-          key_visual_url?: string | null
           logo_url?: string | null
-          products?: Json
-          updated_at?: string | null
-          website_url?: string | null
+          products?: Json | null
         }
         Relationships: [
-          {
-            foreignKeyName: "showcase_booth_id_fkey"
-            columns: ["booth_id"]
-            isOneToOne: false
-            referencedRelation: "booths"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "showcase_event_id_fkey"
             columns: ["event_id"]
@@ -841,9 +674,8 @@ export type Database = {
           created_at: string | null
           id: string
           notes: string | null
-          order_id: string | null
           photo_url: string | null
-          status: string
+          status: string | null
           updated_by: string | null
         }
         Insert: {
@@ -851,9 +683,8 @@ export type Database = {
           created_at?: string | null
           id?: string
           notes?: string | null
-          order_id?: string | null
           photo_url?: string | null
-          status?: string
+          status?: string | null
           updated_by?: string | null
         }
         Update: {
@@ -861,9 +692,8 @@ export type Database = {
           created_at?: string | null
           id?: string
           notes?: string | null
-          order_id?: string | null
           photo_url?: string | null
-          status?: string
+          status?: string | null
           updated_by?: string | null
         }
         Relationships: [
@@ -872,13 +702,6 @@ export type Database = {
             columns: ["assignment_id"]
             isOneToOne: false
             referencedRelation: "assignments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "work_logs_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
           {

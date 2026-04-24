@@ -51,13 +51,13 @@ export default function UsersPage() {
 
   function openEdit(user: Profile) {
     setEditUser(user);
-    setForm({ name: user.name, role: user.role as UserRole, company: user.company ?? '', phone: user.phone ?? '' });
+    setForm({ name: user.full_name || '', role: user.role as UserRole, company: user.company ?? '', phone: user.phone ?? '' });
   }
 
   async function handleSave() {
     if (!editUser) return;
     setSaving(true);
-    await supabase.from('profiles').update({ ...form, updated_at: new Date().toISOString() }).eq('id', editUser.id);
+    await supabase.from('profiles').update({ full_name: form.name, role: form.role, company: form.company, phone: form.phone }).eq('id', editUser.id);
     setSaving(false);
     setEditUser(null);
     loadUsers();
@@ -98,10 +98,15 @@ export default function UsersPage() {
   }
 
   const filtered = users.filter((u) => {
-    const matchSearch = u.name.toLowerCase().includes(search.toLowerCase()) || (u.company ?? '').toLowerCase().includes(search.toLowerCase());
-    const matchRole = roleFilter === 'all' || u.role === roleFilter;
-    return matchSearch && matchRole;
-  });
+  // Tambahkan (u.name || '') agar aman jika name null/undefined
+  const matchSearch = 
+    (u.full_name || '').toLowerCase().includes(search.toLowerCase()) || 
+    (u.company || '').toLowerCase().includes(search.toLowerCase());
+
+  const matchRole = roleFilter === 'all' || u.role === roleFilter;
+  
+  return matchSearch && matchRole;
+});
 
   const stats = ROLES.map((r) => ({ ...r, count: users.filter((u) => u.role === r.value).length }));
 
@@ -169,9 +174,9 @@ export default function UsersPage() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
-                          <span className="text-xs font-bold text-white">{user.name.charAt(0).toUpperCase()}</span>
+                          <span className="text-xs font-bold text-white">{(user.full_name || '?').charAt(0).toUpperCase()}</span>
                         </div>
-                        <span className="font-medium text-gray-900 dark:text-white">{user.name}</span>
+                        <span className="font-medium text-gray-900 dark:text-white">{user.full_name || '—'}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3">

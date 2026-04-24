@@ -7,9 +7,8 @@ import type { Page } from '../../lib/types';
 const pageTitles: Record<Page, string> = {
   dashboard: 'Dashboard',
   users: 'User Management',
-  events: 'Event Management',
+  events: 'Events',
   event_detail: 'Event Detail',
-  floorplan: 'Floorplan',
   services: 'Service Catalog',
   marketplace: 'Service Marketplace',
   my_booth: 'My Booth',
@@ -39,11 +38,9 @@ export default function Header({ currentPage, onMobileMenuToggle }: Props) {
         >
           <Menu size={20} />
         </button>
-        <div>
-          <h1 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
-            {pageTitles[currentPage]}
-          </h1>
-        </div>
+        <h1 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
+          {pageTitles[currentPage]}
+        </h1>
       </div>
 
       <div className="flex items-center gap-1 sm:gap-2">
@@ -64,11 +61,11 @@ export default function Header({ currentPage, onMobileMenuToggle }: Props) {
           <div className="hidden sm:flex items-center gap-2 pl-2 ml-1 border-l border-gray-200 dark:border-gray-700">
             <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
               <span className="text-xs font-bold text-white">
-                {profile.name.charAt(0).toUpperCase()}
+                {(profile?.full_name || '?').charAt(0).toUpperCase()}
               </span>
             </div>
             <div className="text-right hidden md:block">
-              <p className="text-xs font-semibold text-gray-900 dark:text-white leading-tight">{profile.name}</p>
+              <p className="text-xs font-semibold text-gray-900 dark:text-white leading-tight">{profile.full_name || '—'}</p>
               <p className="text-xs text-gray-500 dark:text-gray-400 leading-tight">{getRoleLabel(profile.role)}</p>
             </div>
           </div>

@@ -84,7 +84,7 @@ export default function EventsPage() {
 
   async function loadEvents() {
     setLoading(true);
-    const { data } = await supabase.from('events').select('*, organizer:profiles!events_organizer_id_fkey(id, name)').order('start_date', { ascending: false });
+    const { data } = await supabase.from('events').select('*, organizer:profiles(id, full_name)').order('start_date', { ascending: false });
     setEvents((data as Event[]) ?? []);
     setLoading(false);
   }
@@ -92,8 +92,8 @@ export default function EventsPage() {
   async function handleSave(formData: Partial<Event>) {
     setSaving(true);
     if (editTarget) {
-      const { organizer, ...updateData } = formData;
-      const { data } = await supabase.from('events').update({ ...updateData, updated_at: new Date().toISOString() }).eq('id', editTarget.id).select().maybeSingle();
+      const { organizer, updated_at, ...updateData } = formData;
+      const { data } = await supabase.from('events').update({ ...updateData, updated_at: new Date().toISOString() } as any).eq('id', editTarget.id).select().maybeSingle();
       if (data) setEvents((prev) => prev.map((e) => e.id === editTarget.id ? (data as Event) : e));
     } else {
       const insertData = {

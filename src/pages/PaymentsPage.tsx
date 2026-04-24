@@ -1,5 +1,15 @@
 import { useEffect, useState, useRef } from 'react';
-import { Plus, Search, AlertCircle, CheckCircle, XCircle, ExternalLink, Zap, Upload, Image } from 'lucide-react';
+import {
+  Plus,
+  Search,
+  AlertCircle,
+  CheckCircle,
+  XCircle,
+  ExternalLink,
+  Zap,
+  Upload,
+  Image,
+} from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { formatCurrency, formatDateTime } from '../lib/utils';
@@ -8,121 +18,264 @@ import StatusBadge from '../components/common/StatusBadge';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import type { Payment, Order, Service, Profile } from '../lib/types';
 
-const PAYMENT_METHODS = ['Bank Transfer', 'Cash', 'Credit Card', 'QRIS', 'Virtual Account'];
+const PAYMENT_METHODS = [
+  'Bank Transfer',
+  'Cash',
+  'Credit Card',
+  'QRIS',
+  'Virtual Account',
+];
 
-async function autoDispatchContractor(orderId: string, serviceId: string, assignedBy: string): Promise<string | null> {
-  const { data: contractorServices } = await supabase
-    .from('contractors_services')
-    .select('contractor_id')
-    .eq('service_id', serviceId);
+// ======================================================
+// AUTO DISPATCH CONTRACTOR
+// ======================================================
+// ======================================================
+// AUTO DISPATCH CONTRACTOR (FIXED)
+// ======================================================
+// ======================================================
+// AUTO DISPATCH CONTRACTOR (TS FIXED)
+// ======================================================
+async function autoDispatchContractor(
+  orderId: string,
+  serviceId: string,
+  assignedBy: string
+): Promise<string | null> {
+  try {
+    // ambil service category dari order
+    const { data: order } = await supabase
+      .from('orders')
+      .select(`
+        id,
+        service:services(
+          id,
+          category
+        )
+      `)
+      .eq('id', orderId)
+      .single();
 
-  if (!contractorServices || contractorServices.length === 0) return null;
-  const contractorIds = contractorServices.map((cs) => cs.contractor_id as string);
+    const category = order?.service?.category;
 
-  const { data: activeAssignments } = await supabase
-    .from('assignments')
-    .select('contractor_id')
-    .in('contractor_id', contractorIds)
-    .not('order_id', 'is', null);
+    if (!category) return null;
 
-  const counts: Record<string, number> = {};
-  contractorIds.forEach((id) => (counts[id] = 0));
-  (activeAssignments ?? []).forEach((a) => {
-    if (a.contractor_id) counts[a.contractor_id] = (counts[a.contractor_id] ?? 0) + 1;
+    // contractor yg bisa handle category ini
+    const { data: contractors } = await supabase
+      .from('contractor_assignments')
+      .select('contractor_id, service_categories')
+      .contains('service_categories', [category]);
+
+    if (!contractors || contractors.length === 0) return null;
+
+   const contractorIds = contractors
+  .map((x) => x.contractor_id)
+  .filter((id): id is string => id !== null && id !== undefined);
+
+    if (contractorIds.length === 0) return null;
+
+    // workload
+    const { data: active } = await supabase
+      .from('assignments')
+      .select('contractor_id')
+      .in('contractor_id', contractorIds);
+
+          const counts: Record<string, number> = {};
+
+      contractorIds.forEach((id) => {
+        if (id) counts[id] = 0;
+      });
+
+        active?.forEach((row) => {
+    const id = row.contractor_id;
+
+    if (!id) return;
+
+    counts[id] = (counts[id] ?? 0) + 1;
   });
 
-  const bestContractorId = contractorIds.reduce((best, id) => (counts[id] < counts[best] ? id : best), contractorIds[0]);
+    const best = contractorIds.reduce((a, b) =>
+      counts[a] <= counts[b] ? a : b
+    );
 
-  const { error: assignErr } = await supabase.from('assignments').insert({
-    order_id: orderId,
-    contractor_id: bestContractorId,
-    assigned_by: assignedBy,
-    notes: 'Auto-dispatched after payment verification',
-  });
-  if (assignErr) return null;
+    // insert assignment
+    const { data: assignment } = await supabase
+      .from('assignments')
+      .insert({
+        order_id: orderId,
+        contractor_id: best,
+        notes: 'Auto dispatch'
+      })
+      .select()
+      .single();
 
-  await supabase.from('work_logs').insert({
-    order_id: orderId,
-    status: 'waiting',
-    notes: 'Job created, awaiting contractor pickup',
-    updated_by: assignedBy,
-  });
+    if (!assignment) return null;
 
-  await supabase.from('notifications').insert({
-    user_id: bestContractorId,
-    title: 'New Job Assigned',
-    message: `You have been assigned a new service job. Please check your job list.`,
-    type: 'info',
-    related_id: orderId,
-  });
+    // work log awal
+    await supabase.from('work_logs').insert([{
+      assignment_id: assignment.id,
+      order_id: orderId,
+      status: 'instruction_received',
+      notes: 'Job assigned automatically',
+      updated_by: assignedBy
+    }]);
 
-  return bestContractorId;
+    return best;
+  } catch (err) {
+    console.error(err);
+    return null;
+  }
 }
 
 export default function PaymentsPage() {
   const { profile } = useAuth();
+
   const [payments, setPayments] = useState<Payment[]>([]);
   const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+
   const [showModal, setShowModal] = useState(false);
   const [reviewPayment, setReviewPayment] = useState<Payment | null>(null);
-  const [form, setForm] = useState({ order_id: '', payment_method: 'Bank Transfer' });
+
+  const [form, setForm] = useState({
+    order_id: '',
+    payment_method: 'Bank Transfer',
+  });
+
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [proofPreview, setProofPreview] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [reviewNotes, setReviewNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [dispatchResult, setDispatchResult] = useState('');
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const isExhibitor = profile?.role === 'exhibitor';
-  const canReview = profile?.role === 'eo_admin' || profile?.role === 'super_admin';
+  const canReview =
+    profile?.role === 'eo_admin' || profile?.role === 'super_admin';
 
-  useEffect(() => { loadPayments(); if (isExhibitor) loadPendingOrders(); }, [profile]);
+  useEffect(() => {
+    loadPayments();
+    if (isExhibitor) loadPendingOrders();
+  }, [profile]);
 
+  // ======================================================
+  // LOAD PAYMENTS
+  // ======================================================
   async function loadPayments() {
     setLoading(true);
-    const { data } = await supabase
+
+    const { data, error } = await supabase
       .from('payments')
-      .select('*, order:orders(id, invoice_number, total_price, status, service_id, service:services(id, name), exhibitor:profiles!orders_exhibitor_id_fkey(id, name))')
+      .select(`
+        *,
+       order:orders(
+      id,
+      invoice_number,
+      total_price,
+      status,
+      service_id,
+      exhibitor_id,
+      service:services(
+        id,
+        name
+      ),
+      exhibitor:profiles(
+        id,
+        full_name
+      )
+    )
+      `)
       .order('created_at', { ascending: false });
-    setPayments((data as Payment[]) ?? []);
+
+    if (error) {
+      console.error(error);
+    }
+
+    setPayments((data as Payment[]) || []);
     setLoading(false);
   }
 
+  // ======================================================
+  // LOAD PENDING ORDERS
+  // ======================================================
   async function loadPendingOrders() {
+    if (!profile?.id) return;
+
     const { data } = await supabase
       .from('orders')
-      .select('*, service:services(id, name)')
-      .eq('exhibitor_id', profile!.id)
+      .select(`
+        *,
+        service:services(id,name)
+      `)
+      .eq('exhibitor_id', profile.id)
       .eq('status', 'pending_payment');
-    setPendingOrders((data as Order[]) ?? []);
+
+    setPendingOrders((data as Order[]) || []);
   }
 
-  function handleProofChange(e: React.ChangeEvent<HTMLInputElement>) {
+  // ======================================================
+  // FILE CHANGE
+  // ======================================================
+  function handleProofChange(
+    e: React.ChangeEvent<HTMLInputElement>
+  ) {
     const file = e.target.files?.[0];
     if (!file) return;
+
     setProofFile(file);
+
     const reader = new FileReader();
-    reader.onload = (ev) => setProofPreview(ev.target?.result as string);
+
+    reader.onload = (ev) => {
+      setProofPreview(ev.target?.result as string);
+    };
+
     reader.readAsDataURL(file);
   }
 
+  // ======================================================
+  // SUBMIT PAYMENT
+  // ======================================================
   async function handleSubmit() {
-    if (!form.order_id || !form.payment_method) { setError('Order and payment method are required.'); return; }
-    setSaving(true); setError('');
+    if (!form.order_id || !form.payment_method) {
+      setError('Order and payment method are required.');
+      return;
+    }
+
+    if (!proofFile) {
+      setError('Payment proof is required.');
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+
     try {
       let proofUrl: string | null = null;
+
       if (proofFile) {
         const ext = proofFile.name.split('.').pop();
-        const path = `payment-proofs/${form.order_id}/${Date.now()}.${ext}`;
-        const { error: upErr } = await supabase.storage.from('payment-proofs').upload(path, proofFile);
-        if (!upErr) {
-          const { data: urlData } = supabase.storage.from('payment-proofs').getPublicUrl(path);
-          proofUrl = urlData.publicUrl;
-        }
+        const fileName = `${Date.now()}.${ext}`;
+        const filePath = `${profile?.id}/${fileName}`;
+
+        const { error } = await supabase.storage
+          .from('payment-proofs')
+          .upload(filePath, proofFile, {
+            upsert: true,
+            contentType: proofFile.type
+          });
+
+        if (error) throw error;
+
+        const { data: publicUrl } = supabase.storage
+          .from('payment-proofs')
+          .getPublicUrl(filePath);
+
+        proofUrl = publicUrl.publicUrl;
       }
       const { error: payErr } = await supabase.from('payments').insert({
         order_id: form.order_id,
@@ -130,55 +283,115 @@ export default function PaymentsPage() {
         proof_url: proofUrl,
         status: 'pending_verification',
       });
+
       if (payErr) throw payErr;
+
       setShowModal(false);
-      setForm({ order_id: '', payment_method: 'Bank Transfer' });
       setProofFile(null);
       setProofPreview(null);
-      loadPayments();
-      loadPendingOrders();
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to submit payment');
-    } finally { setSaving(false); }
+      setForm({
+        order_id: '',
+        payment_method: 'Bank Transfer',
+      });
+
+      await loadPayments();
+      await loadPendingOrders();
+    } catch (err: any) {
+      setError(err.message || 'Failed to submit payment');
+    } finally {
+      setSaving(false);
+    }
   }
 
-  async function handleReview(status: 'approved' | 'rejected') {
+  // ======================================================
+  // REVIEW PAYMENT
+  // ======================================================
+  async function handleReview(
+    status: 'approved' | 'rejected'
+  ) {
     if (!reviewPayment) return;
+
     setSaving(true);
+
     try {
-      await supabase.from('payments').update({ status, notes: reviewNotes, verified_by: profile!.id, updated_at: new Date().toISOString() }).eq('id', reviewPayment.id);
+      await supabase
+      .from('payments')
+      .update({
+        status,
+        verified_by: profile?.id
+      } as any)
+      .eq('id', reviewPayment.id);
 
-      if (status === 'approved' && reviewPayment.order_id) {
-        const order = reviewPayment.order as unknown as Order;
-        const serviceId = order?.service_id ?? (order?.service as unknown as Service)?.id;
-        await supabase.from('orders').update({ status: 'paid', updated_at: new Date().toISOString() }).eq('id', reviewPayment.order_id);
+      if (reviewNotes.trim()) {
+      await supabase
+        .from('payments')
+        .update({
+          notes: reviewNotes
+        } as any)
+        .eq('id', reviewPayment.id);
+}
 
-        if (serviceId) {
-          const contractorId = await autoDispatchContractor(reviewPayment.order_id, serviceId, profile!.id);
-          if (contractorId) {
-            await supabase.from('orders').update({ status: 'assigned', updated_at: new Date().toISOString() }).eq('id', reviewPayment.order_id);
-            setDispatchResult('Payment approved and contractor auto-dispatched!');
-          } else {
-            setDispatchResult('Payment approved. No contractor available for this service — please assign manually.');
-          }
-        }
-      } else if (status === 'rejected' && reviewPayment.order_id) {
-        await supabase.from('orders').update({ status: 'pending_payment', updated_at: new Date().toISOString() }).eq('id', reviewPayment.order_id);
+      if (reviewPayment.order_id) {
+        await supabase
+          .from('orders')
+          .update({
+            status:
+              status === 'approved'
+                ? 'paid'
+                : 'pending_payment',
+          })
+          .eq('id', reviewPayment.order_id);
       }
 
+      // auto dispatch jika approved
+      if (
+        status === 'approved' &&
+        reviewPayment.order_id &&
+        reviewPayment.order?.service_id
+      ) {
+        const contractor = await autoDispatchContractor(
+          reviewPayment.order_id,
+          reviewPayment.order.service_id,
+          profile?.id || ''
+        );
+
+        if (contractor) {
+          setDispatchResult(
+            'Payment approved and contractor dispatched automatically.'
+          );
+        }
+      }
+
+      await loadPayments();
       setReviewPayment(null);
-      setReviewNotes('');
-      loadPayments();
-    } finally { setSaving(false); }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setSaving(false);
+    }
   }
 
+  // ======================================================
+  // FILTER
+  // ======================================================
   const filtered = payments.filter((p) => {
-    const order = p.order as unknown as Order;
+    const order = p.order as Order;
+
     const matchSearch =
-      order?.invoice_number?.toLowerCase().includes(search.toLowerCase()) ||
-      p.payment_method.toLowerCase().includes(search.toLowerCase()) ||
-      (order?.exhibitor as unknown as Profile)?.name?.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = statusFilter === 'all' || p.status === statusFilter;
+      order?.invoice_number
+        ?.toLowerCase()
+        .includes(search.toLowerCase()) ||
+      p.payment_method
+        .toLowerCase()
+        .includes(search.toLowerCase()) ||
+      (order?.exhibitor as Profile)?.full_name
+        ?.toLowerCase()
+        .includes(search.toLowerCase());
+
+    const matchStatus =
+      statusFilter === 'all' ||
+      p.status === statusFilter;
+
     return matchSearch && matchStatus;
   });
 
@@ -236,7 +449,7 @@ export default function PaymentsPage() {
                     <tr key={payment.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
                       <td className="px-4 py-3 font-mono text-xs font-medium text-gray-900 dark:text-white whitespace-nowrap">{order?.invoice_number ?? '-'}</td>
                       <td className="px-4 py-3 text-gray-700 dark:text-gray-300 max-w-[130px] truncate">{(order?.service as unknown as Service)?.name ?? '-'}</td>
-                      {canReview && <td className="px-4 py-3 text-gray-700 dark:text-gray-300 whitespace-nowrap">{(order?.exhibitor as unknown as Profile)?.name ?? '-'}</td>}
+                      {canReview && <td className="px-4 py-3 text-gray-700 dark:text-gray-300 whitespace-nowrap">{(order?.exhibitor as unknown as Profile)?.full_name ?? '-'}</td>}
                       <td className="px-4 py-3 text-gray-700 dark:text-gray-300 whitespace-nowrap">{payment.payment_method}</td>
                       <td className="px-4 py-3 text-gray-700 dark:text-gray-300 whitespace-nowrap">{formatCurrency(order?.total_price ?? null)}</td>
                       <td className="px-4 py-3">

@@ -51,10 +51,11 @@ export default function App() {
 
   const role = profile.role as UserRole;
   const startPage = defaultPageByRole[role] ?? 'dashboard';
+  const activePage = currentPage || startPage;
 
   return (
-    <DashboardLayout currentPage={currentPage || startPage} onNavigate={setCurrentPage}>
-      <PageContent page={currentPage || startPage} />
+    <DashboardLayout currentPage={activePage} onNavigate={setCurrentPage}>
+      <PageContent page={activePage} />
     </DashboardLayout>
   );
 }

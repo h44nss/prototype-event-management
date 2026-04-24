@@ -1,30 +1,36 @@
+// ==========================================
+// ENUMS & LITERAL TYPES
+// ==========================================
+
 export type UserRole = 'super_admin' | 'eo_admin' | 'exhibitor' | 'contractor';
-
 export type EventStatus = 'draft' | 'published' | 'active' | 'closed' | 'cancelled';
-
 export type ServiceCategory = 'electricity' | 'internet' | 'booth_support' | 'furniture' | 'av_equipment' | 'general';
-
 export type OrderStatus = 'pending_payment' | 'paid' | 'assigned' | 'on_progress' | 'completed' | 'cancelled';
-
 export type PaymentStatus = 'pending_verification' | 'approved' | 'rejected';
-
 export type WorkStatus = 'instruction_received' | 'in_progress' | 'complete' | 'need_revision';
-
 export type BoothStatus = 'available' | 'assigned';
-
 export type ParticipantStatus = 'invited' | 'accepted' | 'declined';
+export type Page =
+  | 'dashboard' | 'users' | 'events' | 'event_detail' | 'services'
+  | 'marketplace' | 'my_booth' | 'showcase'
+  | 'orders' | 'payments' | 'work_tracking' | 'monitoring' | 'reports';
+
+// ==========================================
+// DOMAIN MODELS
+// ==========================================
 
 export interface Profile {
   id: string;
-  name: string;
+  full_name: string | null; // Sesuai nama kolom di DB
   role: UserRole;
   company: string | null;
   phone: string | null;
   npwp: string | null;
   avatar_url: string | null;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  is_active: boolean | null;
+  created_at: string | null;
+  updated_at?: string | null; // Gunakan tanda ? agar tidak wajib (opsional)
+  
 }
 
 export interface Event {
@@ -40,6 +46,19 @@ export interface Event {
   created_at: string;
   updated_at: string;
   organizer?: Profile;
+}
+
+export interface Service {
+  id: string;
+  name: string;
+  description: string | null;
+  category: ServiceCategory;
+  price: number;
+  unit: string;
+  image_url: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Hall {
@@ -66,19 +85,6 @@ export interface Booth {
   exhibitor?: Profile;
 }
 
-export interface Service {
-  id: string;
-  name: string;
-  description: string | null;
-  category: ServiceCategory;
-  price: number;
-  unit: string;
-  image_url: string | null;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface EventService {
   id: string;
   event_id: string;
@@ -88,15 +94,6 @@ export interface EventService {
   created_at: string;
   service?: Service;
   event?: Event;
-}
-
-export interface ContractorService {
-  id: string;
-  contractor_id: string;
-  service_id: string;
-  created_at: string;
-  contractor?: Profile;
-  service?: Service;
 }
 
 export interface EventParticipant {
@@ -141,6 +138,66 @@ export interface ContractorAssignment {
   event?: Event;
 }
 
+export interface Order {
+  id: string;
+  invoice_number: string;
+  event_id: string;
+  booth_id: string | null;
+  exhibitor_id: string;
+  service_id: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  notes: string | null;
+  status: OrderStatus;
+  created_at: string;
+  updated_at?: string | null;
+  event?: Event;
+  booth?: Booth;
+  exhibitor?: Profile;
+  service?: Service;
+}
+
+export interface Payment {
+  id: string;
+  request_id: string | null;
+  order_id: string;
+  payment_method: string;
+  proof_url: string | null;
+  status: PaymentStatus;
+  notes: string | null;
+  verified_by: string | null;
+  created_at: string;
+  updated_at: string;
+  order?: Order;
+  verifier?: Profile;
+}
+
+export interface Assignment {
+  id: string;
+  order_id: string | null;
+  contractor_id: string | null;
+  notes: string | null;
+  created_at: string | null;
+  order?: Order;
+  contractor?: Profile;
+  assigner?: Profile;
+  work_logs?: WorkLog[];
+}
+
+export interface WorkLog {
+  id: string;
+  assignment_id: string;
+  order_id: string;
+  status: WorkStatus;
+  notes: string | null;
+  photo_url: string | null;
+  updated_by: string;
+  created_at: string;
+  updater?: Profile;
+  assignment?: Assignment;
+}
+
 export interface ShowcaseProduct {
   id: string;
   name: string;
@@ -166,68 +223,6 @@ export interface Showcase {
   booth?: Booth;
 }
 
-export interface Order {
-  id: string;
-  invoice_number: string;
-  event_id: string | null;
-  booth_id: string | null;
-  exhibitor_id: string | null;
-  service_id: string | null;
-  quantity: number;
-  unit_price: number;
-  total_price: number;
-  notes: string | null;
-  status: OrderStatus;
-  created_at: string;
-  updated_at: string;
-  event?: Event;
-  booth?: Booth;
-  exhibitor?: Profile;
-  service?: Service;
-}
-
-export interface Payment {
-  id: string;
-  request_id: string | null;
-  order_id: string | null;
-  payment_method: string;
-  proof_url: string | null;
-  status: PaymentStatus;
-  notes: string | null;
-  verified_by: string | null;
-  created_at: string;
-  updated_at: string;
-  order?: Order;
-  verifier?: Profile;
-}
-
-export interface Assignment {
-  id: string;
-  request_id: string | null;
-  order_id: string | null;
-  contractor_id: string | null;
-  assigned_by: string | null;
-  notes: string | null;
-  created_at: string;
-  order?: Order;
-  contractor?: Profile;
-  assigner?: Profile;
-  work_logs?: WorkLog[];
-}
-
-export interface WorkLog {
-  id: string;
-  assignment_id: string | null;
-  order_id: string | null;
-  status: WorkStatus;
-  notes: string | null;
-  photo_url: string | null;
-  updated_by: string | null;
-  created_at: string;
-  updater?: Profile;
-  assignment?: Assignment;
-}
-
 export interface Notification {
   id: string;
   user_id: string;
@@ -238,19 +233,3 @@ export interface Notification {
   related_id: string | null;
   created_at: string;
 }
-
-export type Page =
-  | 'dashboard'
-  | 'users'
-  | 'events'
-  | 'event_detail'
-  | 'floorplan'
-  | 'services'
-  | 'marketplace'
-  | 'my_booth'
-  | 'showcase'
-  | 'orders'
-  | 'payments'
-  | 'work_tracking'
-  | 'monitoring'
-  | 'reports';

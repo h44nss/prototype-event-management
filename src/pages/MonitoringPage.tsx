@@ -6,6 +6,7 @@ import StatusBadge from '../components/common/StatusBadge';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import type { Assignment, WorkLog, Order, Profile, Service } from '../lib/types';
 
+
 interface AssignmentWithDetails extends Assignment {
   latest_log?: WorkLog;
 }
@@ -13,6 +14,7 @@ interface AssignmentWithDetails extends Assignment {
 interface ContractorStat {
   id: string;
   name: string;
+  full_name?: string;
   company: string | null;
   active: number;
   done: number;
@@ -34,7 +36,7 @@ export default function MonitoringPage() {
       .select(`
         *,
         order:orders(id, invoice_number, total_price, service:services(id, name, category), booth:booths(id, number), event:events(id, name)),
-        contractor:profiles!assignments_contractor_id_fkey(id, name, company)
+        contractor:profiles!assignments_contractor_id_fkey(id, full_name, company)
       `)
       .order('created_at', { ascending: false });
 
@@ -59,7 +61,14 @@ export default function MonitoringPage() {
     enriched.forEach((a) => {
       const c = a.contractor as unknown as Profile;
       if (!c) return;
-      if (!statsMap[c.id]) statsMap[c.id] = { id: c.id, name: c.name, company: c.company, active: 0, done: 0, total: 0 };
+      if (!statsMap[c.id]) statsMap[c.id] = { 
+        id: c.id, 
+        name: c.full_name ?? 'No Name', 
+        company: c.company ?? '-', 
+        active: 0, 
+        done: 0, 
+        total: 0 
+      };
       statsMap[c.id].total++;
       const status = a.latest_log?.status ?? 'waiting';
       if (status === 'complete') statsMap[c.id].done++;
@@ -143,7 +152,7 @@ export default function MonitoringPage() {
                           {(order as unknown as { invoice_number?: string })?.invoice_number ?? '-'}
                         </td>
                         <td className="px-4 py-3 text-gray-700 dark:text-gray-300 max-w-[140px] truncate">{service?.name ?? '-'}</td>
-                        <td className="px-4 py-3 text-gray-700 dark:text-gray-300 whitespace-nowrap">{contractor?.name ?? '-'}</td>
+                        <td className="px-4 py-3 text-gray-700 dark:text-gray-300 whitespace-nowrap">{contractor?.full_name ?? '-'}</td>
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-400 max-w-[130px] truncate">
                           {(order?.event as unknown as { name?: string })?.name ?? '-'}
                         </td>

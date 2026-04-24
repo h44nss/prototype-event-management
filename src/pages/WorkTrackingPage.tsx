@@ -40,44 +40,122 @@ export default function WorkTrackingPage() {
   useEffect(() => { loadAssignments(); }, [profile]);
 
   async function loadAssignments() {
-    setLoading(true);
-    let query = supabase
-      .from('assignments')
+  setLoading(true);
+
+  type MiniService = {
+    id: string;
+    name: string;
+    category: string;
+  };
+
+  type MiniBooth = {
+    id: string;
+    number: string;
+  };
+
+  type MiniEvent = {
+    id: string;
+    name: string;
+  };
+
+  type MiniOrder = {
+    id: string;
+    invoice_number: string;
+    service?: MiniService | null;
+    booth?: MiniBooth | null;
+    event?: MiniEvent | null;
+  };
+
+  type MiniProfile = {
+    id: string;
+    full_name: string | null;
+    company: string | null;
+  };
+
+  type AssignmentRow = Assignment & {
+    order?: MiniOrder | null;
+    contractor?: MiniProfile | null;
+    latest_log?: WorkLog;
+  };
+
+  let query = supabase
+    .from('assignments')
+    .select(`
+      *,
+      order:orders(
+        id,
+        invoice_number,
+        service:services(id,name,category),
+        booth:booths(id,number),
+        event:events(id,name)
+      ),
+      contractor:profiles!assignments_contractor_id_fkey(
+        id,
+        full_name,
+        company
+      )
+    `)
+    .order('created_at', { ascending: false });
+
+  if (isContractor) {
+    query = query.eq('contractor_id', profile!.id);
+  }
+
+  const { data } = await query;
+
+  const list = (data as unknown as AssignmentRow[]) ?? [];
+
+  const ids = list.map((a) => a.id);
+
+  const logsMap: Record<string, WorkLog> = {};
+
+  if (ids.length > 0) {
+    const { data: logs } = await supabase
+      .from('work_logs')
       .select(`
         *,
-        order:orders(id, invoice_number, service:services(id, name, category), booth:booths(id, number), event:events(id, name)),
-        contractor:profiles!assignments_contractor_id_fkey(id, name, company)
+        updater:profiles!work_logs_updated_by_fkey(
+          id,
+          full_name
+        )
       `)
+      .in('assignment_id', ids)
       .order('created_at', { ascending: false });
-    if (isContractor) query = query.eq('contractor_id', profile!.id);
 
-    const { data } = await query;
-    const list = (data as Assignment[]) ?? [];
+    (logs ?? []).forEach((log) => {
+      const item = log as unknown as WorkLog;
 
-    const ids = list.map((a) => a.id);
-    const logsMap: Record<string, WorkLog> = {};
-    if (ids.length > 0) {
-      const { data: logs } = await supabase
-        .from('work_logs')
-        .select('*, updater:profiles!work_logs_updated_by_fkey(id, name)')
-        .in('assignment_id', ids)
-        .order('created_at', { ascending: false });
-      (logs ?? []).forEach((log) => {
-        if (!logsMap[log.assignment_id!]) logsMap[log.assignment_id!] = log as WorkLog;
-      });
-    }
-    setAssignments(list.map((a) => ({ ...a, latest_log: logsMap[a.id] })));
-    setLoading(false);
+      if (item.assignment_id && !logsMap[item.assignment_id]) {
+        logsMap[item.assignment_id] = item;
+      }
+    });
   }
 
-  async function loadWorkLogs(assignmentId: string) {
-    const { data } = await supabase
-      .from('work_logs')
-      .select('*, updater:profiles!work_logs_updated_by_fkey(id, name)')
-      .eq('assignment_id', assignmentId)
-      .order('created_at', { ascending: false });
-    setWorkLogs((data as WorkLog[]) ?? []);
-  }
+  setAssignments(
+    list.map((a) => ({
+      ...a,
+      latest_log: logsMap[a.id],
+    }))
+  );
+
+  setLoading(false);
+}
+
+ async function loadWorkLogs(assignmentId: string) {
+  const { data } = await supabase
+    .from('work_logs')
+    .select(`
+      *,
+      updater:profiles!work_logs_updated_by_fkey(
+        id,
+        full_name
+      )
+    `)
+    .eq('assignment_id', assignmentId)
+    .order('created_at', { ascending: false });
+
+  setWorkLogs((data as unknown as WorkLog[]) ?? []);
+}
 
   function openUpdate(assignment: AssignmentWithLog) {
     const currentStatus = (assignment.latest_log?.status as WorkStatus) ?? 'instruction_received';
@@ -112,7 +190,6 @@ export default function WorkTrackingPage() {
 
       await supabase.from('work_logs').insert({
         assignment_id: updateTarget.id,
-        order_id: updateTarget.order_id,
         status: form.status,
         notes: form.notes || null,
         photo_url: photoUrl,
@@ -145,7 +222,7 @@ export default function WorkTrackingPage() {
     const matchSearch =
       (order as unknown as { invoice_number?: string })?.invoice_number?.toLowerCase().includes(search.toLowerCase()) ||
       (order?.service as unknown as Service)?.name?.toLowerCase().includes(search.toLowerCase()) ||
-      contractor?.name?.toLowerCase().includes(search.toLowerCase());
+      contractor?.full_name?.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === 'all' || latestStatus === statusFilter;
     return matchSearch && matchStatus;
   });
@@ -234,7 +311,7 @@ export default function WorkTrackingPage() {
                     {!isContractor && (
                       <div className="flex items-center gap-1.5">
                         <span className="font-medium text-gray-600 dark:text-gray-300">Contractor:</span>
-                        <span>{contractor?.name ?? '-'}</span>
+                        <span>{contractor?.full_name ?? '-'}</span>
                       </div>
                     )}
                     <div className="flex items-center gap-1.5">
@@ -397,7 +474,7 @@ export default function WorkTrackingPage() {
                           <img src={log.photo_url} alt="Work photo" className="w-full h-full object-cover" />
                         </div>
                       )}
-                      <p className="text-xs text-gray-400">by {(log.updater as unknown as Profile)?.name ?? 'Unknown'}</p>
+                      <p className="text-xs text-gray-400">by {(log.updater as unknown as Profile)?.full_name ?? 'Unknown'}</p>
                     </div>
                   );
                 })}
